@@ -21,4 +21,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "KotMod6"
 include(":app")
- 
+include(":server")
