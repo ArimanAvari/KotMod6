@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -37,7 +36,6 @@ import com.example.kotmod6.presentation.common.LoadingBlock
 fun UserDetailScreen(
     state: UserDetailState,
     onBack: () -> Unit,
-    onLogout: () -> Unit,
     onRetry: () -> Unit
 ) {
     Scaffold(
@@ -47,11 +45,6 @@ fun UserDetailScreen(
                 navigationIcon = {
                     TextButton(onClick = onBack) {
                         Text(text = "Назад")
-                    }
-                },
-                actions = {
-                    TextButton(onClick = onLogout) {
-                        Text(text = "Выйти")
                     }
                 }
             )
@@ -69,7 +62,6 @@ fun UserDetailScreen(
 
             is UserDetailState.Success -> DetailContent(
                 user = state.user,
-                onLogout = onLogout,
                 modifier = Modifier.padding(innerPadding)
             )
         }
@@ -79,7 +71,6 @@ fun UserDetailScreen(
 @Composable
 private fun DetailContent(
     user: AppUser,
-    onLogout: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -111,17 +102,6 @@ private fun DetailContent(
 
         InfoLine(title = "Username", value = "@${user.username}")
         InfoLine(title = "Email", value = user.email)
-        InfoLine(title = "Телефон", value = user.phone.ifBlank { "Не указан" })
-        InfoLine(title = "Возраст", value = user.age?.toString() ?: "Не указан")
-        InfoLine(title = "Город", value = user.city.ifBlank { "Не указан" })
-        InfoLine(title = "Компания", value = user.company.ifBlank { "Не указана" })
-
-        Button(
-            onClick = onLogout,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text(text = "Выйти из аккаунта")
-        }
     }
 }
 

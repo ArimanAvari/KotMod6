@@ -44,7 +44,6 @@ fun AuthRootScreen(
             else -> UserDetailScreen(
                 state = detailState,
                 onBack = onBackToUsers,
-                onLogout = onLogout,
                 onRetry = onRetryDetail
             )
         }
