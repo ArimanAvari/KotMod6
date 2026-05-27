@@ -7,14 +7,10 @@ import androidx.lifecycle.viewModelScope
 import com.example.kotmod6.data.local.TokenStorage
 import com.example.kotmod6.data.remote.NetworkModule
 import com.example.kotmod6.data.repository.ServerNobelRepository
-import com.example.kotmod6.domain.model.NobelPrize
-import com.example.kotmod6.domain.usecase.AddFavoriteUseCase
-import com.example.kotmod6.domain.usecase.GetFavoritesUseCase
 import com.example.kotmod6.domain.usecase.GetPrizeDetailUseCase
 import com.example.kotmod6.domain.usecase.GetPrizesUseCase
 import com.example.kotmod6.domain.usecase.LoginUseCase
 import com.example.kotmod6.domain.usecase.LogoutUseCase
-import com.example.kotmod6.domain.usecase.RemoveFavoriteUseCase
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -25,9 +21,6 @@ class NobelClientViewModel(
     private val loginUseCase: LoginUseCase,
     private val getPrizesUseCase: GetPrizesUseCase,
     private val getPrizeDetailUseCase: GetPrizeDetailUseCase,
-    private val getFavoritesUseCase: GetFavoritesUseCase,
-    private val addFavoriteUseCase: AddFavoriteUseCase,
-    private val removeFavoriteUseCase: RemoveFavoriteUseCase,
     private val logoutUseCase: LogoutUseCase,
     tokenStorage: TokenStorage
 ) : ViewModel() {
@@ -43,17 +36,24 @@ class NobelClientViewModel(
                 } else if (_state.value.checkingToken || _state.value.screen == AppScreen.Login) {
                     _state.update { it.copy(checkingToken = false, screen = AppScreen.List) }
                     loadPrizes()
-                    loadFavorites()
                 }
             }
         }
     }
 
     fun changeUsername(value: String) = _state.update { it.copy(username = value, error = null) }
+
     fun changePassword(value: String) = _state.update { it.copy(password = value, error = null) }
-    fun changeFilterYear(value: String) = _state.update { it.copy(filterYear = value.filter(Char::isDigit).take(4)) }
-    fun changeFilterCategory(value: String) = _state.update { it.copy(filterCategory = value.trim()) }
-    fun applyFilter() = _state.update { it.copy(message = "Фильтр применен") }
+
+    fun changeFilterYear(value: String) {
+        _state.update { it.copy(filterYear = value.filter(Char::isDigit).take(4)) }
+    }
+
+    fun changeFilterCategory(category: PrizeCategory) {
+        _state.update { it.copy(selectedCategory = category) }
+    }
+
+    fun applyFilter() = _state.update { it.copy(error = null) }
 
     fun login() {
         val current = _state.value
@@ -65,9 +65,8 @@ class NobelClientViewModel(
         viewModelScope.launch {
             runLoading {
                 loginUseCase(current.username.trim(), current.password)
-                _state.update { it.copy(password = "", screen = AppScreen.List, message = "Вход выполнен") }
+                _state.update { it.copy(password = "", screen = AppScreen.List) }
                 loadPrizes()
-                loadFavorites()
             }
         }
     }
@@ -81,61 +80,23 @@ class NobelClientViewModel(
         }
     }
 
-    private fun loadFavorites() {
-        viewModelScope.launch {
-            try {
-                val favorites = getFavoritesUseCase()
-                _state.update { it.copy(favorites = favorites) }
-            } catch (_: Exception) {
-                // Если сервер пока недоступен, список премий все равно покажет свою ошибку.
-            }
-        }
-    }
-
-    fun openPrize(prize: NobelPrize) {
+    fun openLaureate(entry: LaureateEntry) {
         viewModelScope.launch {
             runLoading {
-                val detail = getPrizeDetailUseCase(prize.year, prize.category)
-                _state.update { it.copy(selectedPrize = detail, screen = AppScreen.Detail) }
-            }
-        }
-    }
-
-    fun openFavorites() {
-        viewModelScope.launch {
-            runLoading {
-                val favorites = getFavoritesUseCase()
-                _state.update { it.copy(favorites = favorites, screen = AppScreen.Favorites) }
-            }
-        }
-    }
-
-    fun openList() = _state.update { it.copy(screen = AppScreen.List, selectedPrize = null) }
-    fun backToList() = openList()
-
-    fun addFavorite(prize: NobelPrize) {
-        viewModelScope.launch {
-            runLoading {
-                val result = addFavoriteUseCase(prize.year, prize.category)
-                val favorites = getFavoritesUseCase()
-                _state.update { it.copy(message = result.message, favorites = favorites) }
-            }
-        }
-    }
-
-    fun removeFavorite(prize: NobelPrize) {
-        viewModelScope.launch {
-            runLoading {
-                val result = removeFavoriteUseCase(prize.year, prize.category)
-                val favorites = getFavoritesUseCase()
+                val prize = getPrizeDetailUseCase(entry.prize.year, entry.prize.category)
+                val laureate = prize.laureates.firstOrNull { it.id == entry.laureate.id } ?: entry.laureate
                 _state.update {
                     it.copy(
-                        message = result.message,
-                        favorites = favorites
+                        selectedLaureate = LaureateEntry(prize = prize, laureate = laureate),
+                        screen = AppScreen.Detail
                     )
                 }
             }
         }
+    }
+
+    fun backToList() {
+        _state.update { it.copy(screen = AppScreen.List, selectedLaureate = null, error = null) }
     }
 
     fun logout() {
@@ -146,7 +107,7 @@ class NobelClientViewModel(
     }
 
     private suspend fun runLoading(block: suspend () -> Unit) {
-        _state.update { it.copy(loading = true, error = null, message = null) }
+        _state.update { it.copy(loading = true, error = null) }
         try {
             block()
             _state.update { it.copy(loading = false) }
@@ -155,7 +116,7 @@ class NobelClientViewModel(
                 it.copy(
                     loading = false,
                     error = error.localizedMessage?.takeIf(String::isNotBlank)
-                        ?: "Не получилось выполнить запрос"
+                        ?: "Не получилось загрузить данные"
                 )
             }
         }
@@ -173,9 +134,6 @@ class NobelClientViewModel(
                         loginUseCase = LoginUseCase(repository),
                         getPrizesUseCase = GetPrizesUseCase(repository),
                         getPrizeDetailUseCase = GetPrizeDetailUseCase(repository),
-                        getFavoritesUseCase = GetFavoritesUseCase(repository),
-                        addFavoriteUseCase = AddFavoriteUseCase(repository),
-                        removeFavoriteUseCase = RemoveFavoriteUseCase(repository),
                         logoutUseCase = LogoutUseCase(repository),
                         tokenStorage = storage
                     ) as T

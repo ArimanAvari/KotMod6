@@ -1,6 +1,8 @@
 package com.example.kotmod6.presentation
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -9,32 +11,42 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.example.kotmod6.domain.model.NobelPrize
 
 @Composable
 fun NobelClientRoot(
@@ -44,61 +56,31 @@ fun NobelClientRoot(
     onLogin: () -> Unit,
     onRetry: () -> Unit,
     onFilterYearChange: (String) -> Unit,
-    onFilterCategoryChange: (String) -> Unit,
+    onFilterCategoryChange: (PrizeCategory) -> Unit,
     onApplyFilter: () -> Unit,
-    onOpenPrize: (NobelPrize) -> Unit,
-    onBack: () -> Unit,
-    onAddFavorite: (NobelPrize) -> Unit,
-    onRemoveFavorite: (NobelPrize) -> Unit,
-    onOpenFavorites: () -> Unit,
-    onOpenList: () -> Unit,
-    onLogout: () -> Unit
+    onOpenLaureate: (LaureateEntry) -> Unit,
+    onBack: () -> Unit
 ) {
     if (state.checkingToken) {
-        LoadingScreen()
+        LoadingBlock()
         return
     }
 
     when (state.screen) {
         AppScreen.Login -> LoginScreen(state, onUsernameChange, onPasswordChange, onLogin)
-        AppScreen.List -> PrizeListScreen(
+        AppScreen.List -> LaureateListScreen(
             state = state,
             onRetry = onRetry,
-            onOpenPrize = onOpenPrize,
-            onOpenFavorites = onOpenFavorites,
-            onFilterYearChange = onFilterYearChange,
-            onFilterCategoryChange = onFilterCategoryChange,
+            onYearChange = onFilterYearChange,
+            onCategoryChange = onFilterCategoryChange,
             onApplyFilter = onApplyFilter,
-            onLogout = onLogout
+            onLaureateClick = onOpenLaureate
         )
 
-        AppScreen.Detail -> PrizeDetailScreen(
+        AppScreen.Detail -> LaureateDetailScreen(
             state = state,
-            prize = state.selectedPrize,
-            onBack = onBack,
-            onAddFavorite = onAddFavorite,
-            onRemoveFavorite = onRemoveFavorite,
-            onLogout = onLogout
+            onBack = onBack
         )
-
-        AppScreen.Favorites -> FavoritesScreen(
-            state = state,
-            onOpenPrize = onOpenPrize,
-            onOpenList = onOpenList,
-            onRemoveFavorite = onRemoveFavorite,
-            onLogout = onLogout
-        )
-    }
-}
-
-@Composable
-private fun LoadingScreen() {
-    Column(
-        modifier = Modifier.fillMaxSize(),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        CircularProgressIndicator()
     }
 }
 
@@ -156,193 +138,306 @@ private fun LoginScreen(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun PrizeListScreen(
+private fun LaureateListScreen(
     state: NobelClientState,
     onRetry: () -> Unit,
-    onOpenPrize: (NobelPrize) -> Unit,
-    onOpenFavorites: () -> Unit,
-    onFilterYearChange: (String) -> Unit,
-    onFilterCategoryChange: (String) -> Unit,
+    onYearChange: (String) -> Unit,
+    onCategoryChange: (PrizeCategory) -> Unit,
     onApplyFilter: () -> Unit,
-    onLogout: () -> Unit
+    onLaureateClick: (LaureateEntry) -> Unit
 ) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Премии") },
-                actions = {
-                    TextButton(onClick = onOpenFavorites) { Text("Избранное") }
-                    TextButton(onClick = onLogout) { Text("Выйти") }
-                }
+                title = { Text("Нобелевские лауреаты") }
             )
         }
     ) { innerPadding ->
         Column(Modifier.padding(innerPadding)) {
-            FilterBar(state, onFilterYearChange, onFilterCategoryChange, onApplyFilter)
-            StatusText(state)
+            FilterPanel(
+                state = state,
+                onYearChange = onYearChange,
+                onCategoryChange = onCategoryChange,
+                onApplyFilter = onApplyFilter
+            )
+
             if (state.loading) {
-                LoadingScreen()
+                LoadingBlock()
             } else if (state.error != null) {
                 ErrorBlock(state.error, onRetry)
             } else {
-                PrizeList(state.visiblePrizes, onOpenPrize)
+                LaureateList(
+                    laureates = state.visibleLaureates,
+                    onLaureateClick = onLaureateClick
+                )
             }
-        }
-    }
-}
-
-@Composable
-private fun FilterBar(
-    state: NobelClientState,
-    onYear: (String) -> Unit,
-    onCategory: (String) -> Unit,
-    onApply: () -> Unit
-) {
-    Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            OutlinedTextField(
-                value = state.filterYear,
-                onValueChange = onYear,
-                modifier = Modifier.weight(0.7f),
-                label = { Text("Год") },
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
-            )
-            OutlinedTextField(
-                value = state.filterCategory,
-                onValueChange = onCategory,
-                modifier = Modifier.weight(1f),
-                label = { Text("Категория") },
-                singleLine = true
-            )
-        }
-        Button(onClick = onApply, modifier = Modifier.fillMaxWidth()) {
-            Text("Применить")
-        }
-    }
-}
-
-@Composable
-private fun PrizeList(
-    prizes: List<NobelPrize>,
-    onOpenPrize: (NobelPrize) -> Unit
-) {
-    LazyColumn(
-        contentPadding = PaddingValues(14.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
-    ) {
-        items(prizes, key = { it.id }) { prize ->
-            PrizeCard(prize, onClick = { onOpenPrize(prize) })
-        }
-    }
-}
-
-@Composable
-private fun PrizeCard(prize: NobelPrize, onClick: () -> Unit) {
-    Card(
-        onClick = onClick,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)
-    ) {
-        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text(prize.title, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
-            Text(prize.description, maxLines = 2, overflow = TextOverflow.Ellipsis)
-            Text("${prize.laureates.size} лауреатов", color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun PrizeDetailScreen(
+private fun FilterPanel(
     state: NobelClientState,
-    prize: NobelPrize?,
-    onBack: () -> Unit,
-    onAddFavorite: (NobelPrize) -> Unit,
-    onRemoveFavorite: (NobelPrize) -> Unit,
-    onLogout: () -> Unit
+    onYearChange: (String) -> Unit,
+    onCategoryChange: (PrizeCategory) -> Unit,
+    onApplyFilter: () -> Unit
 ) {
+    var expanded by remember { mutableStateOf(false) }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 10.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            OutlinedTextField(
+                value = state.filterYear,
+                onValueChange = onYearChange,
+                modifier = Modifier.weight(0.8f),
+                singleLine = true,
+                label = { Text("Год") },
+                placeholder = { Text("2023") },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+            )
+
+            ExposedDropdownMenuBox(
+                expanded = expanded,
+                onExpandedChange = { expanded = !expanded },
+                modifier = Modifier.weight(1.2f)
+            ) {
+                OutlinedTextField(
+                    value = state.selectedCategory.title,
+                    onValueChange = {},
+                    readOnly = true,
+                    singleLine = true,
+                    label = { Text("Категория") },
+                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+                    modifier = Modifier.menuAnchor(MenuAnchorType.PrimaryNotEditable, enabled = true)
+                )
+
+                ExposedDropdownMenu(
+                    expanded = expanded,
+                    onDismissRequest = { expanded = false }
+                ) {
+                    PrizeCategory.Values.forEach { category ->
+                        DropdownMenuItem(
+                            text = { Text(category.title) },
+                            onClick = {
+                                onCategoryChange(category)
+                                expanded = false
+                            }
+                        )
+                    }
+                }
+            }
+        }
+
+        Button(
+            onClick = onApplyFilter,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("Применить фильтр")
+        }
+    }
+}
+
+@Composable
+private fun LaureateList(
+    laureates: List<LaureateEntry>,
+    onLaureateClick: (LaureateEntry) -> Unit
+) {
+    LazyColumn(
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        items(laureates, key = { it.key }) { item ->
+            LaureateCard(
+                item = item,
+                onClick = { onLaureateClick(item) }
+            )
+        }
+    }
+}
+
+@Composable
+private fun LaureateCard(
+    item: LaureateEntry,
+    onClick: () -> Unit
+) {
+    Card(
+        onClick = onClick,
+        shape = MaterialTheme.shapes.medium,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = item.year,
+                    color = MaterialTheme.colorScheme.primary,
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = item.category,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+            Text(
+                text = item.laureate.fullName,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold
+            )
+            Text(
+                text = item.shortMotivation.ifBlank { "Описание не указано" },
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodyMedium,
+                maxLines = 3,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun LaureateDetailScreen(
+    state: NobelClientState,
+    onBack: () -> Unit
+) {
+    val item = state.selectedLaureate
+
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Детали") },
-                navigationIcon = { TextButton(onClick = onBack) { Text("Назад") } },
-                actions = { TextButton(onClick = onLogout) { Text("Выйти") } }
+                title = { Text("Подробности") },
+                navigationIcon = {
+                    TextButton(onClick = onBack) {
+                        Text("Назад")
+                    }
+                }
             )
         }
     ) { innerPadding ->
-        if (prize == null) {
-            ErrorBlock("Премия не выбрана", onBack)
+        if (state.loading) {
+            LoadingBlock(modifier = Modifier.padding(innerPadding))
             return@Scaffold
         }
+
+        if (state.error != null) {
+            ErrorBlock(state.error, onBack, modifier = Modifier.padding(innerPadding))
+            return@Scaffold
+        }
+
+        if (item == null) {
+            ErrorBlock("Лауреат не выбран", onBack, modifier = Modifier.padding(innerPadding))
+            return@Scaffold
+        }
+
         Column(
             modifier = Modifier
                 .padding(innerPadding)
-                .padding(18.dp)
-                .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(20.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(18.dp)
         ) {
-            Text(prize.title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-            Text(prize.description)
-            Text("Raw JSON: ${prize.rawJson}", color = MaterialTheme.colorScheme.onSurfaceVariant)
-            prize.laureates.forEach { laureate ->
-                Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)) {
-                    Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text(laureate.fullName, fontWeight = FontWeight.SemiBold)
-                        Text(laureate.birthCountry, color = MaterialTheme.colorScheme.primary)
-                        Text(laureate.motivation)
-                    }
-                }
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                Button(onClick = { onAddFavorite(prize) }, enabled = !state.loading) {
-                    Text("В избранное")
-                }
-                OutlinedButton(onClick = { onRemoveFavorite(prize) }, enabled = !state.loading) {
-                    Text("Удалить")
-                }
-            }
-            StatusText(state)
+            InitialsCircle(item.laureate.fullName)
+            Text(
+                text = item.laureate.fullName,
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center
+            )
+            InfoBlock(title = "Премия", value = "${item.year} · ${item.category}")
+            InfoBlock(title = "Мотивация", value = item.laureate.motivation.ifBlank { "Описание не указано" })
+            InfoBlock(title = "Место рождения", value = item.laureate.birthCountry)
         }
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun FavoritesScreen(
-    state: NobelClientState,
-    onOpenPrize: (NobelPrize) -> Unit,
-    onOpenList: () -> Unit,
-    onRemoveFavorite: (NobelPrize) -> Unit,
-    onLogout: () -> Unit
+private fun InitialsCircle(name: String) {
+    Box(
+        modifier = Modifier
+            .size(132.dp)
+            .clip(CircleShape)
+            .background(MaterialTheme.colorScheme.primaryContainer),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = name.initials(),
+            color = MaterialTheme.colorScheme.onPrimaryContainer,
+            style = MaterialTheme.typography.headlineMedium,
+            fontWeight = FontWeight.Bold
+        )
+    }
+}
+
+@Composable
+private fun InfoBlock(
+    title: String,
+    value: String
 ) {
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Избранное") },
-                navigationIcon = { TextButton(onClick = onOpenList) { Text("Назад") } },
-                actions = { TextButton(onClick = onLogout) { Text("Выйти") } }
-            )
-        }
-    ) { innerPadding ->
-        Column(Modifier.padding(innerPadding)) {
-            StatusText(state)
-            LazyColumn(
-                contentPadding = PaddingValues(14.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                items(state.favorites, key = { it.id }) { prize ->
-                    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)) {
-                        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Text(prize.title, fontWeight = FontWeight.Bold)
-                            Text(prize.description, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                                Button(onClick = { onOpenPrize(prize) }) { Text("Открыть") }
-                                OutlinedButton(onClick = { onRemoveFavorite(prize) }) { Text("Удалить") }
-                            }
-                        }
-                    }
-                }
-            }
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        Text(
+            text = title,
+            color = MaterialTheme.colorScheme.primary,
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.Bold
+        )
+        Text(
+            text = value,
+            style = MaterialTheme.typography.bodyLarge
+        )
+    }
+}
+
+@Composable
+private fun LoadingBlock(modifier: Modifier = Modifier) {
+    Column(
+        modifier = modifier.fillMaxSize(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        CircularProgressIndicator()
+    }
+}
+
+@Composable
+private fun ErrorBlock(
+    message: String,
+    onRetry: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .padding(24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Text(message, color = MaterialTheme.colorScheme.error)
+        Button(onClick = onRetry, modifier = Modifier.padding(top = 14.dp)) {
+            Text("Повторить")
         }
     }
 }
@@ -356,27 +451,12 @@ private fun StatusText(state: NobelClientState) {
             modifier = Modifier.padding(top = 10.dp)
         )
     }
-    state.message?.let {
-        Text(
-            text = it,
-            color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.padding(top = 10.dp)
-        )
-    }
 }
 
-@Composable
-private fun ErrorBlock(message: String, onRetry: () -> Unit) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        Text(message, color = MaterialTheme.colorScheme.error)
-        Button(onClick = onRetry, modifier = Modifier.padding(top = 14.dp)) {
-            Text("Повторить")
-        }
-    }
+private fun String.initials(): String {
+    return split(" ")
+        .filter { it.isNotBlank() }
+        .take(2)
+        .joinToString("") { it.first().uppercase() }
+        .ifBlank { "?" }
 }

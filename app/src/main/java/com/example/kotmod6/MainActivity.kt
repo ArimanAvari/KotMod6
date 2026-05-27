@@ -33,13 +33,8 @@ class MainActivity : ComponentActivity() {
                     onFilterYearChange = viewModel::changeFilterYear,
                     onFilterCategoryChange = viewModel::changeFilterCategory,
                     onApplyFilter = viewModel::applyFilter,
-                    onOpenPrize = viewModel::openPrize,
-                    onBack = viewModel::backToList,
-                    onAddFavorite = viewModel::addFavorite,
-                    onRemoveFavorite = viewModel::removeFavorite,
-                    onOpenFavorites = viewModel::openFavorites,
-                    onOpenList = viewModel::openList,
-                    onLogout = viewModel::logout
+                    onOpenLaureate = viewModel::openLaureate,
+                    onBack = viewModel::backToList
                 )
             }
         }
