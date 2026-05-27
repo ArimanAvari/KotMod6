@@ -11,6 +11,8 @@ import com.example.kotmod6.domain.usecase.GetPrizeDetailUseCase
 import com.example.kotmod6.domain.usecase.GetPrizesUseCase
 import com.example.kotmod6.domain.usecase.LoginUseCase
 import com.example.kotmod6.domain.usecase.LogoutUseCase
+import io.ktor.client.plugins.ClientRequestException
+import io.ktor.http.HttpStatusCode
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -112,14 +114,26 @@ class NobelClientViewModel(
             block()
             _state.update { it.copy(loading = false) }
         } catch (error: Exception) {
-            _state.update {
-                it.copy(
-                    loading = false,
-                    error = error.localizedMessage?.takeIf(String::isNotBlank)
-                        ?: "Не получилось загрузить данные"
+            if (error.isUnauthorized()) {
+                logoutUseCase()
+                _state.value = NobelClientState(
+                    checkingToken = false,
+                    error = "Сессия истекла, войдите снова"
                 )
+            } else {
+                _state.update {
+                    it.copy(
+                        loading = false,
+                        error = error.localizedMessage?.takeIf(String::isNotBlank)
+                            ?: "Не получилось загрузить данные"
+                    )
+                }
             }
         }
+    }
+
+    private fun Throwable.isUnauthorized(): Boolean {
+        return this is ClientRequestException && response.status == HttpStatusCode.Unauthorized
     }
 
     companion object {

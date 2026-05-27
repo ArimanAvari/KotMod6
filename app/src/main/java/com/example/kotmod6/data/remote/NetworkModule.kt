@@ -17,6 +17,7 @@ object NetworkModule {
 
     val api = NobelServerApi(
         client = HttpClient(OkHttp) {
+            expectSuccess = true
             install(ContentNegotiation) {
                 json(json)
             }
